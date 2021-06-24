@@ -1,0 +1,401 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.4">
+  <POU Name="MAIN" Id="{2c2f55e7-080b-487d-9d72-09d31d4c2a00}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR CONSTANT
+	Bogie_Allowable_Error : REAL := 2;	// Should be 0.5 - 1
+	Bogie_Stabiliser_Allowable_Error : REAL := 0.5;
+END_VAR
+VAR	
+	AmsId    : T_AmsNetId := '5.61.32.144.1.1';
+	bChangeSeparatorToComma	: BOOL := FALSE;
+{region "sequence timer"=======================================================
+	fbSequenceTimer        : FB_Sequence_Timer;
+	SequenceTimerArray     : ARRAY [0..255] OF REAL;
+	ResetSequenceTimeCount : BOOL;
+{endregion}
+	
+    fbStabiliser_Control_A     : FB_AxisControl := (fVelocity := 50);	
+	fbStabiliser_Control_B     : FB_AxisControl := (fVelocity := 50);	
+	fbStabiliser_Control_C     : FB_AxisControl := (fVelocity := 50);	
+	fbStabiliser_Control_D    : FB_AxisControl := (fVelocity := 50);
+		 
+	// Four Wheel Drive Bogie System
+
+	Bogie_DriveA_Control         	: FB_AxisControl;   // FRONT RIGHT
+	Bogie_DriveA_Position	: REAL;
+	 
+	Bogie_DriveB_Control         	: FB_AxisControl;	//REAR RIGHT
+	Bogie_DriveB_Position	: REAL;
+	
+	Bogie_DriveC_Control         	: FB_AxisControl;   // FRONT RIGHT
+	Bogie_DriveC_Position	: REAL;
+	 
+	Bogie_DriveD_Control         	: FB_AxisControl;	//REAR RIGHT
+	Bogie_DriveD_Position	: REAL;
+		  	
+	Boogie_Reset_Counter : INT := 0;
+	BoogieHome : BOOL := FALSE;
+	Boogie_Reset_Position : REAL := 5400;
+	Bogie_Slow_Zone : REAL := 100;
+	Boogie_Threshold_Crossed : BOOL := FALSE; 
+	
+	Bogie_Stabiliser_Slow_Zone : REAL := 10;
+	
+	StabAResetSent : BOOL := FALSE;
+	StabBResetSent : BOOL := FALSE;
+	StabCResetSent : BOOL := FALSE;
+	StabDResetSent : BOOL := FALSE;
+	StabiliserAResst : TON :=(PT := T#10MS);
+	StabiliserBResst : TON :=(PT := T#10MS);
+	StabiliserCResst : TON :=(PT := T#10MS);
+	StabiliserDResst : TON :=(PT := T#10MS);
+	
+	BCount : INT := 0;
+	Trigger_Found : BOOL := FALSE;
+	
+	fPosition: REAL;
+
+END_VAR
+
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[//################################## AC axes control ############################################################################
+
+
+IF (NOT GVL.Bogie_Stabiliser_A_Deployed) AND (NOT GVL.Bogie_Stabiliser_B_Deployed) AND (NOT GVL.Bogie_Stabiliser_C_Deployed) AND (NOT GVL.Bogie_Stabiliser_D_Deployed) THEN
+	IF NOT (GVL.Bogie_Pause) THEN				
+		
+	Bogie_DriveA_Control(
+		xEnable     := (GVL.IsEnabled) OR (GVL.Bogie_DriveA_Manual_Enable),
+		xMoveA      := NOT GVL.Bogie_DriveA_In_Position,
+		fPosition   := GVL.Bogie_DriveA_Required_Position,
+		fVelocity   := GVL.Bogie_DriveA_Velocity ,
+		Axis        := GVL.Bogie_DriveA);		 
+			 
+	GVL.Bogie_DriveA_IN_Position := FUN_In_Zone(GVL.Bogie_DriveA_Current_Position, GVL.Bogie_DriveA_Required_Position, 1);
+		 
+	IF(GVL.Bogie_DriveA_Manual_Enable AND GVL.Bogie_DriveA_IN_Position)THEN
+	//	GVL.DriveAll := FALSE;
+		GVL.Bogie_DriveA_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveB_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveC_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveD_Manual_Enable := FALSE; 
+	END_IF	
+
+
+	Bogie_DriveB_Control(
+		xEnable     := (GVL.IsEnabled) OR (GVL.Bogie_DriveB_Manual_Enable),
+		xMoveA      := NOT GVL.Bogie_DriveB_In_Position,
+		fPosition   := GVL.Bogie_DriveB_Required_Position,
+		fVelocity   := GVL.Bogie_DriveB_Velocity ,
+		Axis        := GVL.Bogie_DriveB);		 
+		 
+	GVL.Bogie_DriveB_IN_Position := FUN_In_Zone(GVL.Bogie_DriveB_Current_Position, GVL.Bogie_DriveB_Required_Position, 1);
+		 
+	IF(GVL.Bogie_DriveB_Manual_Enable AND GVL.Bogie_DriveB_IN_Position)THEN
+	//	GVL.DriveAll := FALSE;
+	//	GVL.Bogie_DriveA_Manual_Enable := FALSE; 
+		GVL.Bogie_DriveB_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveC_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveD_Manual_Enable := FALSE; 
+	END_IF
+	
+	Bogie_DriveC_Control(
+		xEnable     := (GVL.IsEnabled) OR (GVL.Bogie_DriveC_Manual_Enable),
+		xMoveA      := NOT GVL.Bogie_DriveC_In_Position,
+		fPosition   := GVL.Bogie_DriveC_Required_Position,
+		fVelocity   := GVL.Bogie_DriveC_Velocity ,
+		Axis        := GVL.Bogie_DriveC);		 
+			 
+	GVL.Bogie_DriveC_IN_Position := FUN_In_Zone(GVL.Bogie_DriveC_Current_Position, GVL.Bogie_DriveC_Required_Position, 1);
+	 
+	IF(GVL.Bogie_DriveB_Manual_Enable AND GVL.Bogie_DriveB_IN_Position)THEN
+	//	GVL.DriveAll := FALSE;
+	//	GVL.Bogie_DriveA_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveB_Manual_Enable := FALSE; 
+		GVL.Bogie_DriveC_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveD_Manual_Enable := FALSE; 
+	END_IF
+
+	Bogie_DriveD_Control(
+		xEnable     := (GVL.IsEnabled) OR (GVL.Bogie_DriveD_Manual_Enable),
+		xMoveA      := NOT GVL.Bogie_DriveD_In_Position,
+		fPosition   := GVL.Bogie_DriveD_Required_Position,
+		fVelocity   := GVL.Bogie_DriveD_Velocity ,
+		Axis        := GVL.Bogie_DriveD);		 
+			 
+	GVL.Bogie_DriveD_IN_Position := FUN_In_Zone(GVL.Bogie_DriveD_Current_Position, GVL.Bogie_DriveD_Required_Position, 1);
+	 
+	IF(GVL.Bogie_DriveB_Manual_Enable AND GVL.Bogie_DriveB_IN_Position)THEN
+	//	GVL.DriveAll := FALSE;
+	//	GVL.Bogie_DriveA_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveB_Manual_Enable := FALSE; 
+	//	GVL.Bogie_DriveC_Manual_Enable := FALSE; 
+		GVL.Bogie_DriveD_Manual_Enable := FALSE; 
+	END_IF
+	
+	END_IF
+
+ELSE
+	GVL.Bogie_Stabiliser_A_Required_Position := 0;	
+	GVL.Bogie_Stabiliser_A_Deploy := TRUE;
+	GVL.Bogie_Stabiliser_B_Required_Position := 0;	
+	GVL.Bogie_Stabiliser_B_Deploy := TRUE;	
+	GVL.Bogie_Stabiliser_C_Required_Position := 0;	
+	GVL.Bogie_Stabiliser_C_Deploy := TRUE;	
+	//GVL.Bogie_Stabiliser_D_Required_Position := 0;	
+	//GVL.Bogie_Stabiliser_D_Deploy := TRUE;	
+END_IF
+
+//-------------------------------------------------------------------------------------------------------------------
+
+IF (GVL.Bogie_Stabiliser_A_Deploy OR GVL.Bogie_Stabiliser_A_Manual_Enable) THEN
+	IF (GVL.Bogie_Stabiliser_A_Deployed) THEN
+		GVL.Bogie_Stabiliser_A_Required_Position := 0;	
+		GVL.Bogie_Stabiliser_A_Deployed := FALSE;	
+	END_IF
+
+	fbStabiliser_Control_A(
+		xEnable := GVL.Bogie_Stabiliser_A_Manual_Enable OR GVL.Bogie_Stabiliser_A_Deploy,
+		fPosition := GVL.Bogie_Stabiliser_A_Required_Position,
+		xMoveA := NOT GVL.Bogie_Stabiliser_A_In_Position,
+		Axis := GVL.Stabiliser_A_Axis);
+
+	GVL.Bogie_Stabiliser_A_In_Position := FUN_In_Zone(Current := GVL.Bogie_Stabiliser_A_Current_Position, Required := GVL.Bogie_Stabiliser_A_Required_Position, Margin := 1 );	
+
+	IF (INPUT.Stabilser_A_Torque > GVL.Stabiliser_Max_Torque_1 AND GVL.Bogie_Stabiliser_A_Required_Position > 0) THEN
+		GVL.Bogie_Stabiliser_A_In_Position := TRUE;
+		OUTPUT.Stabiliser_A_FastStop := 128;
+		GVL.Bogie_Stabiliser_A_Required_Position := GVL.Bogie_Stabiliser_A_Current_Position;
+		GVL.Bogie_Stabiliser_A_Deployed := TRUE;
+		GVL.Bogie_Stabiliser_A_Deploy := FALSE;	
+		GVL.Bogie_Stabiliser_A_Manual_Enable := FALSE;	
+		GVL.Bogie_Stabiliser_A_Required_Position := 0;
+		fbStabiliser_Control_A(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_A_Axis);	
+	ELSIF (GVL.Bogie_Stabiliser_A_In_Position) THEN	
+		OUTPUT.Stabiliser_A_FastStop := 128;
+		IF (GVL.Bogie_Stabiliser_A_Current_Position > 100) THEN
+			GVL.Bogie_Stabiliser_A_Deployed := TRUE;
+		ELSE
+			GVL.Bogie_Stabiliser_A_Deployed := FALSE;
+		END_IF				
+		GVL.Bogie_Stabiliser_A_Deploy := FALSE;		
+		GVL.Bogie_Stabiliser_A_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_A_Required_Position := 0;
+		fbStabiliser_Control_A(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_A_Axis);	
+	ELSIF (GVL.Bogie_Stabiliser_A_Current_Position < 60) THEN
+		GVL.Bogie_Stabiliser_A_Deployed := FALSE;
+	END_IF	
+END_IF
+
+IF (GVL.Bogie_Stabiliser_B_Deploy OR GVL.Bogie_Stabiliser_B_Manual_Enable) THEN
+	IF (GVL.Bogie_Stabiliser_B_Deployed) THEN
+		GVL.Bogie_Stabiliser_B_Required_Position := 0;	
+		GVL.Bogie_Stabiliser_B_Deployed := FALSE;
+	END_IF
+
+	fbStabiliser_Control_B(
+		xEnable := GVL.Bogie_Stabiliser_B_Manual_Enable OR GVL.Bogie_Stabiliser_B_Deploy,
+		fPosition := GVL.Bogie_Stabiliser_B_Required_Position,
+		xMoveA := NOT GVL.Bogie_Stabiliser_B_In_Position,
+		Axis := GVL.Stabiliser_B_Axis);
+		
+	GVL.Bogie_Stabiliser_B_In_Position := FUN_In_Zone(Current := GVL.Bogie_Stabiliser_B_Current_Position, Required := GVL.Bogie_Stabiliser_B_Required_Position, Margin := 1 );	
+	
+	IF (INPUT.Stabilser_B_Torque < GVL.Stabiliser_Max_Torque_2 AND GVL.Bogie_Stabiliser_B_Required_Position > 0) THEN
+		GVL.Bogie_Stabiliser_B_In_Position := TRUE;
+		OUTPUT.Stabiliser_B_FastStop := 128;
+		GVL.Bogie_Stabiliser_B_Required_Position := GVL.Bogie_Stabiliser_B_Current_Position;
+		GVL.Bogie_Stabiliser_B_Deployed := TRUE;
+		GVL.Bogie_Stabiliser_B_Deploy := FALSE;
+		GVL.Bogie_Stabiliser_B_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_B_Required_Position := 0;	
+		fbStabiliser_Control_B(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_B_Axis);		
+	ELSIF (GVL.Bogie_Stabiliser_B_In_Position) THEN	
+		OUTPUT.Stabiliser_B_FastStop := 128;	
+		IF (GVL.Bogie_Stabiliser_B_Current_Position > 100) THEN
+			GVL.Bogie_Stabiliser_B_Deployed := TRUE;
+		ELSE
+			GVL.Bogie_Stabiliser_B_Deployed := FALSE;
+		END_IF	
+		GVL.Bogie_Stabiliser_B_Deploy := FALSE;
+		GVL.Bogie_Stabiliser_B_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_B_Required_Position := 0;	
+		fbStabiliser_Control_B(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_B_Axis);			
+		ELSIF (GVL.Bogie_Stabiliser_B_Current_Position < 60) THEN
+		GVL.Bogie_Stabiliser_B_Deployed := FALSE;
+	END_IF	
+	
+END_IF
+
+IF (GVL.Bogie_Stabiliser_C_Deploy OR GVL.Bogie_Stabiliser_C_Manual_Enable) THEN
+	IF (GVL.Bogie_Stabiliser_C_Deployed) THEN
+		GVL.Bogie_Stabiliser_C_Required_Position := 0;	
+		GVL.Bogie_Stabiliser_C_Deployed := FALSE;	
+	END_IF
+
+	fbStabiliser_Control_C(
+		xEnable := GVL.Bogie_Stabiliser_C_Manual_Enable OR GVL.Bogie_Stabiliser_C_Deploy,
+		fPosition := GVL.Bogie_Stabiliser_C_Required_Position,
+		xMoveA := NOT GVL.Bogie_Stabiliser_C_In_Position,
+		Axis := GVL.Stabiliser_C_Axis);
+
+	GVL.Bogie_Stabiliser_C_In_Position := FUN_In_Zone(Current := GVL.Bogie_Stabiliser_C_Current_Position, Required := GVL.Bogie_Stabiliser_C_Required_Position, Margin := 1 );	
+
+	IF (INPUT.Stabilser_C_Torque > GVL.Stabiliser_Max_Torque_1 AND GVL.Bogie_Stabiliser_C_Required_Position > 0) THEN
+		GVL.Bogie_Stabiliser_C_In_Position := TRUE;
+		OUTPUT.Stabiliser_C_FastStop := 128;
+		GVL.Bogie_Stabiliser_C_Required_Position := GVL.Bogie_Stabiliser_C_Current_Position;
+		GVL.Bogie_Stabiliser_C_Deployed := TRUE;
+		GVL.Bogie_Stabiliser_C_Deploy := FALSE;	
+		GVL.Bogie_Stabiliser_C_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_C_Required_Position := 0;
+		fbStabiliser_Control_C(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_C_Axis);	
+	ELSIF (GVL.Bogie_Stabiliser_C_In_Position) THEN	
+		OUTPUT.Stabiliser_C_FastStop := 128;				
+		IF (GVL.Bogie_Stabiliser_C_Current_Position > 100) THEN
+			GVL.Bogie_Stabiliser_C_Deployed := TRUE;
+		ELSE
+			GVL.Bogie_Stabiliser_C_Deployed := FALSE;
+		END_IF	
+		GVL.Bogie_Stabiliser_C_Deploy := FALSE;		
+		GVL.Bogie_Stabiliser_C_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_C_Required_Position := 0;
+		fbStabiliser_Control_C(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_C_Axis);
+		ELSIF (GVL.Bogie_Stabiliser_C_Current_Position < 60) THEN
+		GVL.Bogie_Stabiliser_C_Deployed := FALSE;
+	END_IF		
+END_IF
+
+
+IF (GVL.Bogie_Stabiliser_D_Deploy OR GVL.Bogie_Stabiliser_D_Manual_Enable) THEN
+	IF (GVL.Bogie_Stabiliser_D_Deployed) THEN	
+		GVL.Bogie_Stabiliser_D_Required_Position := 0;	
+		GVL.Bogie_Stabiliser_D_Deployed := FALSE;
+	END_IF
+	
+	fbStabiliser_Control_D(
+		xEnable := GVL.Bogie_Stabiliser_D_Manual_Enable OR GVL.Bogie_Stabiliser_D_Deploy,
+		fPosition := GVL.Bogie_Stabiliser_D_Required_Position,
+		xMoveA := NOT GVL.Bogie_Stabiliser_D_In_Position,
+		Axis := GVL.Stabiliser_D_Axis);
+		
+	GVL.Bogie_Stabiliser_D_In_Position := FUN_In_Zone(Current := GVL.Bogie_Stabiliser_D_Current_Position, Required := GVL.Bogie_Stabiliser_D_Required_Position, Margin := 1 );			
+
+	IF (INPUT.Stabilser_D_Torque < GVL.Stabiliser_Max_Torque_2 AND GVL.Bogie_Stabiliser_D_Required_Position > 0) THEN
+		GVL.Bogie_Stabiliser_D_In_Position := TRUE;
+		OUTPUT.Stabiliser_D_FastStop := 128;
+		GVL.Bogie_Stabiliser_D_Required_Position := GVL.Bogie_Stabiliser_D_Current_Position;
+		GVL.Bogie_Stabiliser_D_Deployed := TRUE;
+		GVL.Bogie_Stabiliser_D_Deploy := FALSE;	
+		GVL.Bogie_Stabiliser_D_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_D_Required_Position := 0;
+		fbStabiliser_Control_D(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_D_Axis);	
+	ELSIF (GVL.Bogie_Stabiliser_D_In_Position) THEN	
+		OUTPUT.Stabiliser_D_FastStop := 128;				
+		IF (GVL.Bogie_Stabiliser_D_Current_Position > 100) THEN
+			GVL.Bogie_Stabiliser_D_Deployed := TRUE;
+		ELSE
+			GVL.Bogie_Stabiliser_D_Deployed := FALSE;
+		END_IF	
+		GVL.Bogie_Stabiliser_D_Deploy := FALSE;		
+		GVL.Bogie_Stabiliser_D_Manual_Enable := FALSE;
+		GVL.Bogie_Stabiliser_D_Required_Position := 0;
+		fbStabiliser_Control_D(
+			xEnable := FALSE,
+			xMoveA := FALSE,
+			Axis := GVL.Stabiliser_D_Axis);
+		ELSIF (GVL.Bogie_Stabiliser_D_Current_Position < 60) THEN
+		GVL.Bogie_Stabiliser_D_Deployed := FALSE;
+	END_IF		
+	
+END_IF
+
+StabiliserAResst();
+StabiliserBResst();
+StabiliserCResst();
+StabiliserDResst();
+
+IF ((OUTPUT.Stabiliser_A_FastStop = 128) AND  NOT StabAResetSent) THEN
+	StabAResetSent := TRUE;
+	StabiliserAResst.PT := T#10MS;
+	StabiliserAResst.IN := TRUE;
+END_IF
+
+IF (StabiliserAResst.Q) THEN
+	StabiliserAResst.IN :=FALSE;
+	StabAResetSent := FALSE;
+	OUTPUT.Stabiliser_A_FastStop := 0;
+END_IF
+
+IF ((OUTPUT.Stabiliser_B_FastStop = 128) AND  NOT StabBResetSent) THEN
+	StabBResetSent := TRUE;
+	StabiliserBResst.PT := T#10MS;
+	StabiliserBResst.IN := TRUE;
+END_IF
+
+IF (StabiliserBResst.Q) THEN
+	StabiliserBResst.IN :=FALSE;
+	StabBResetSent := FALSE;
+	OUTPUT.Stabiliser_B_FastStop := 0;
+END_IF
+
+IF ((OUTPUT.Stabiliser_C_FastStop = 128) AND  NOT StabCResetSent) THEN
+	StabCResetSent := TRUE;
+	StabiliserCResst.PT := T#10MS;
+	StabiliserCResst.IN := TRUE;
+END_IF
+
+IF (StabiliserCResst.Q) THEN
+	StabiliserCResst.IN :=FALSE;
+	StabCResetSent := FALSE;
+	OUTPUT.Stabiliser_C_FastStop := 0;
+END_IF
+
+IF ((OUTPUT.Stabiliser_D_FastStop = 128) AND  NOT StabDResetSent) THEN
+	StabDResetSent := TRUE;
+	StabiliserDResst.PT := T#10MS;
+	StabiliserDResst.IN := TRUE;
+END_IF
+
+IF (StabiliserDResst.Q) THEN
+	StabiliserDResst.IN :=FALSE;
+	StabDResetSent := FALSE;
+	OUTPUT.Stabiliser_D_FastStop := 0;
+END_IF]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="213" Count="0" />
+      <LineId Id="809" Count="0" />
+      <LineId Id="214" Count="2" />
+      <LineId Id="241" Count="0" />
+      <LineId Id="685" Count="66" />
+      <LineId Id="304" Count="12" />
+      <LineId Id="2" Count="0" />
+      <LineId Id="318" Count="236" />
+      <LineId Id="317" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.4">
+  <GVL Name="OUTPUT" Id="{60dfa48a-3cc1-4ba3-8c58-4e993215d229}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'TcContextName':='PlcTaskMAIN'}
+VAR_GLOBAL
+
+	BogieAlarmEngaged AT%Q* : BOOL;
+
+	Bogie_Stabiliser_Hi_Speed     AT%Q* : BOOL;
+	Bogie_Stabiliser_Fwd          AT%Q* : BOOL;
+	Bogie_Stabiliser_Rev          AT%Q* : BOOL;
+	
+	Stabiliser_A_FastStop	AT%Q*	:USINT	:= 0;
+	Stabiliser_B_FastStop	AT%Q*	:USINT	:= 0;
+	Stabiliser_C_FastStop	AT%Q*	:USINT	:= 0;
+	Stabiliser_D_FastStop	AT%Q*	:USINT	:= 0;
+
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

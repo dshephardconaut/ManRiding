@@ -1,0 +1,37 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.4">
+  <GVL Name="INPUT" Id="{d5afceb9-3170-4b2d-9ca2-bba88f5d25b6}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'TcContextName':='PlcTaskMAIN'}
+VAR_GLOBAL
+
+	Is_Emergency_Stop_Healthy AT%I* : BOOL := TRUE;                    // Emergency stop boolean	
+
+	Temperature_Sensor_Raw     AT%I* : INT := 100;									  // Temperature pulled from the LowerBoard > Term7 > RTD > Value 
+	Wind_Speed_In              AT%I* : INT;                                   
+	
+	ABLR_Current_Position   AT%I* : UDINT;
+	
+	ABLR_Arm_Inclinometer_X_In AT%I* : INT;
+	ABLR_Arm_Inclinometer_X : REAL;
+	ABLR_Arm_Inclinometer_Y_In AT%I* : INT;
+	ABLR_Arm_Inclinometer_Y : REAL;
+		
+	Stabilser_A_Torque			AT%I* : INT;
+	Stabilser_B_Torque			AT%I* : INT;
+	Stabilser_C_Torque			AT%I* : INT;
+	Stabilser_D_Torque			AT%I* : INT;
+	
+	DriveA_Velocity				AT%I* : REAL;
+	DriveB_Velocity				AT%I* : REAL;
+	DriveC_Velocity				AT%I* : REAL;
+	DriveD_Velocity				AT%I* : REAL;
+	
+	DriveA_Torque				AT%I* : INT;
+	DriveB_Torque				AT%I* : INT;
+	DriveC_Torque				AT%I* : INT;
+	DriveD_Torque				AT%I* : INT;
+		
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>

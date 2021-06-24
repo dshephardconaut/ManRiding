@@ -1,0 +1,141 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.4">
+  <GVL Name="GVL" Id="{d0fa082a-32f7-4598-89b1-780f597975c9}">
+    <Declaration><![CDATA[	{attribute 'qualified_only'}
+	{attribute 'TcContextName':='PlcTaskMAIN'}
+VAR_GLOBAL PERSISTENT
+	//New Version
+	Bogie_Clean_Position : REAL := 0;
+		
+END_VAR
+
+VAR_GLOBAL CONSTANT
+	
+END_VAR
+
+
+VAR_GLOBAL
+	Home_Button_Activated 		: BOOL := FALSE;
+	Cleaning_Button_Activated 	: BOOL := FALSE;
+	Finish_Current_Brick 		: BOOL := FALSE;
+	HMI_Connected 				: BOOL := FALSE;
+	database		: ARRAY[0..100] OF STRING(100);(* Target PLC database *)
+
+	
+	AMSID : T_AmsNetId  := '5.61.32.144.1.1';       // this is the ADS address for the IPC on the robot
+
+	Use_Current_As_Clean_Position : BOOL := FALSE;
+	
+{region "axis refs"}	
+	Bogie_DriveA	: AXIS_REF; 
+	Bogie_DriveB	: AXIS_REF; 
+	Bogie_DriveC	: AXIS_REF; 
+	Bogie_DriveD	: AXIS_REF; 		 
+	Stabiliser_A_Axis	: AXIS_REF;
+	Stabiliser_B_Axis	: AXIS_REF;	
+	Stabiliser_C_Axis	: AXIS_REF;		
+	Stabiliser_D_Axis	: AXIS_REF;		
+		 
+	Bogie_DriveA_Velocity        	: LREAL;
+	Bogie_DriveB_Velocity        	: LREAL;
+	Bogie_DriveC_Velocity        	: LREAL;
+	Bogie_DriveD_Velocity        	: LREAL;
+
+{endregion}
+	 
+{region "TCP/Lazer Adjust"}
+
+{endregion}
+
+{region "Bogie Alarm"}
+	BogieAlarmTimer : TON := (PT := T#2S);
+{endregion}
+	
+{region "procedure variables"}	
+	// Main procedure Variables
+	IsEnabled		   : BOOL	:= FALSE;
+	Is_Running          : BOOL;                         // the boolean to indicate if the robot is running in a sequence mode
+	Is_Start_Button_Pressed          : BOOL;                         // boolean representing the start button on the HMI
+	Is_Stop_Button_Pressed           : BOOL := TRUE;                 // boolean representing the stop button on the HMI - boots to false, preventing the sequence initiaiting without explicit commmand
+	Cancel_Manuals					 : BOOL;		 
+	
+{region "ablr/ bogie vars"}	
+	// Four Wheel Drive Bogie System
+	Bogie_Pause					: BOOL := FALSE;
+	  
+	Bogie_DriveA_Current_Position      : REAL;                          // bogie current position  
+	Bogie_DriveA_Required_Position     : REAL;
+	Bogie_DriveA_In_Position           : BOOL;
+	Bogie_DriveA_Manual_Enable         : BOOL;
+	Bogie_DriveA_Encoder_Reset         : BOOL := FALSE;
+	Bogie_DriveA_Pause					: BOOL := FALSE;
+		 
+	Bogie_DriveB_Current_Position      : REAL;                          // bogie current position
+	Bogie_DriveB_Required_Position     : REAL;
+	Bogie_DriveB_In_Position           : BOOL;
+	Bogie_DriveB_Manual_Enable         : BOOL;
+	Bogie_DriveB_Encoder_Reset         : BOOL := FALSE;
+	Bogie_DriveB_Pause					: BOOL := FALSE;
+		 
+	Bogie_DriveC_Current_Position      : REAL;                          // bogie current position
+	Bogie_DriveC_Required_Position     : REAL;
+	Bogie_DriveC_In_Position           : BOOL;
+	Bogie_DriveC_Manual_Enable         : BOOL;
+	Bogie_DriveC_Encoder_Reset         : BOOL := FALSE;
+	Bogie_DriveC_Pause					: BOOL := FALSE;
+		 
+	Bogie_DriveD_Current_Position      : REAL;                          // bogie current position
+	Bogie_DriveD_Required_Position     : REAL;
+	Bogie_DriveD_In_Position           : BOOL;
+	Bogie_DriveD_Manual_Enable         : BOOL;
+	Bogie_DriveD_Encoder_Reset         : BOOL := FALSE;
+	Bogie_DriveD_Pause					: BOOL := FALSE;
+
+{endregion}
+	
+	Bogie_Stabiliser_A_Deployed :BOOL := TRUE;
+	Bogie_Stabiliser_A_Deploy :BOOL := FALSE;
+	Bogie_Stabiliser_A_Manual_Enable  :BOOL :=FALSE;
+	Bogie_Stabiliser_A_Current_Position :REAL :=0;
+	Bogie_Stabiliser_A_Required_Position :LREAL :=0;
+	Bogie_Stabiliser_A_In_Position : BOOL := FALSE;
+
+	Bogie_Stabiliser_B_Deployed :BOOL := TRUE;
+	Bogie_Stabiliser_B_Deploy :BOOL := FALSE;
+	Bogie_Stabiliser_B_Manual_Enable  :BOOL :=FALSE;
+	Bogie_Stabiliser_B_Current_Position :REAL :=0;
+	Bogie_Stabiliser_B_Required_Position :LREAL :=0;
+	Bogie_Stabiliser_B_In_Position : BOOL := FALSE;
+
+	Bogie_Stabiliser_C_Deployed :BOOL := TRUE;
+	Bogie_Stabiliser_C_Deploy :BOOL := FALSE;
+	Bogie_Stabiliser_C_Manual_Enable  :BOOL :=FALSE;
+	Bogie_Stabiliser_C_Current_Position :REAL :=0;
+	Bogie_Stabiliser_C_Required_Position :LREAL :=0;
+	Bogie_Stabiliser_C_In_Position : BOOL := FALSE;
+
+	Bogie_Stabiliser_D_Deployed :BOOL := TRUE;
+	Bogie_Stabiliser_D_Deploy :BOOL := FALSE;
+	Bogie_Stabiliser_D_Manual_Enable  :BOOL :=FALSE;
+	Bogie_Stabiliser_D_Current_Position :REAL :=0;
+	Bogie_Stabiliser_D_Required_Position :LREAL :=0;
+	Bogie_Stabiliser_D_In_Position : BOOL := FALSE;
+			
+	Stabiliser_Max_Torque_1 :REAL := 1150;
+	Stabiliser_Max_Torque_2 :REAL := -1150;
+		
+	Bogie_Stabiliser_B: INT;
+	
+	ABLR_Height	:REAL	:=0;
+	ABLR_Brick_Len :REAL :=0;
+	
+	RawYawValue : REAL := 0;
+	
+	RxBufferEL			: ComBuffer;	(* Receive data buffer; used with all receive function blocks *)
+	TxBufferEL			: ComBuffer;	(* Transmit data buffer; used with all receive function blocks *)
+	
+	Brick_Measured :BOOL := FALSE;
+	
+END_VAR]]></Declaration>
+  </GVL>
+</TcPlcObject>
